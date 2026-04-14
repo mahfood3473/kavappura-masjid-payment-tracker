@@ -5,19 +5,39 @@ const SCRIPT_URL = process.env.APPS_SCRIPT_URL!;
 
 async function scriptGet(action: string) {
   const url = `${SCRIPT_URL}?action=${action}`;
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await fetch(url, { cache: 'no-store', redirect: 'follow' });
   if (!res.ok) throw new Error(`Apps Script GET failed: ${res.status}`);
   return res.json();
 }
 
 async function scriptPost(action: string, data: any) {
-  const res = await fetch(SCRIPT_URL, {
+  const payload = JSON.stringify({ action, data });
+
+  // Google Apps Script returns a 302 redirect on POST.
+  // fetch() follows it but converts POST→GET and drops the body.
+  // So we disable redirect, grab the Location header, and re-POST to it.
+  const initial = await fetch(SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, data }),
+    body: payload,
+    redirect: 'manual',
   });
-  if (!res.ok) throw new Error(`Apps Script POST failed: ${res.status}`);
-  return res.json();
+
+  if (initial.status === 302 || initial.status === 301) {
+    const redirectUrl = initial.headers.get('location');
+    if (!redirectUrl) throw new Error('Apps Script redirect with no location');
+
+    const res = await fetch(redirectUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    });
+    if (!res.ok) throw new Error(`Apps Script POST failed: ${res.status}`);
+    return res.json();
+  }
+
+  if (!initial.ok) throw new Error(`Apps Script POST failed: ${initial.status}`);
+  return initial.json();
 }
 
 // ─── Members ───────────────────────────────────────────────────
