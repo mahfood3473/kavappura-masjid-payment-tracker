@@ -109,24 +109,59 @@ function deletePaymentsForMember(memberId) {
   }
 }
 
-// ─── Web App handlers ─────────────────────────────────────────
+// ─── Execute a write action ───────────────────────────────────
+
+function executeWrite(action, data) {
+  var result = { success: true };
+  try {
+    switch (action) {
+      case 'addMember':
+        addMember(data);
+        break;
+      case 'updateMember':
+        updateMember(data);
+        break;
+      case 'deleteMember':
+        deleteMember(data.id);
+        break;
+      case 'addPayment':
+        addPayment(data);
+        break;
+      case 'addPaymentsBulk':
+        data.forEach(function(p) { addPayment(p); });
+        result.count = data.length;
+        break;
+      case 'deletePayment':
+        deletePayment(data.id);
+        break;
+      default:
+        result = { success: false, error: 'Unknown action: ' + action };
+    }
+  } catch (err) {
+    result = { success: false, error: err.message };
+  }
+  return result;
+}
+
+// ─── Web App: all via GET to avoid POST redirect issues ───────
 
 function doGet(e) {
   var action = e.parameter.action;
   var result;
 
-  switch (action) {
-    case 'getMembers':
-      result = getAllMembers();
-      break;
-    case 'getPayments':
-      result = getAllPayments();
-      break;
-    case 'getAll':
-      result = { members: getAllMembers(), payments: getAllPayments() };
-      break;
-    default:
-      result = { error: 'Unknown action: ' + action };
+  // Read actions
+  if (action === 'getMembers') {
+    result = getAllMembers();
+  } else if (action === 'getPayments') {
+    result = getAllPayments();
+  } else if (action === 'getAll') {
+    result = { members: getAllMembers(), payments: getAllPayments() };
+  } else if (action === 'write') {
+    // Write actions: payload is JSON-encoded in the 'payload' parameter
+    var body = JSON.parse(e.parameter.payload);
+    result = executeWrite(body.action, body.data);
+  } else {
+    result = { error: 'Unknown action: ' + action };
   }
 
   return ContentService
@@ -136,36 +171,7 @@ function doGet(e) {
 
 function doPost(e) {
   var body = JSON.parse(e.postData.contents);
-  var action = body.action;
-  var result = { success: true };
-
-  try {
-    switch (action) {
-      case 'addMember':
-        addMember(body.data);
-        break;
-      case 'updateMember':
-        updateMember(body.data);
-        break;
-      case 'deleteMember':
-        deleteMember(body.data.id);
-        break;
-      case 'addPayment':
-        addPayment(body.data);
-        break;
-      case 'addPaymentsBulk':
-        body.data.forEach(function(p) { addPayment(p); });
-        result.count = body.data.length;
-        break;
-      case 'deletePayment':
-        deletePayment(body.data.id);
-        break;
-      default:
-        result = { success: false, error: 'Unknown action: ' + action };
-    }
-  } catch (err) {
-    result = { success: false, error: err.message };
-  }
+  var result = executeWrite(body.action, body.data);
 
   return ContentService
     .createTextOutput(JSON.stringify(result))
