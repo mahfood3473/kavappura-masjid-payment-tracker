@@ -97,7 +97,15 @@ export default function ReportsPage() {
     });
   }, [payments, selectedYear, activeMembers.length]);
 
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+  const years = useMemo(() => {
+    const paymentYears = payments.map((p) => p.year).filter((y) => y > 0);
+    const allYears = new Set([...paymentYears, currentYear]);
+    // Always include from 2020 to current year + 1 so all years are selectable
+    for (let y = 2020; y <= currentYear + 1; y++) {
+      allYears.add(y);
+    }
+    return Array.from(allYears).sort((a, b) => a - b);
+  }, [payments, currentYear]);
 
   if (loading) {
     return (
