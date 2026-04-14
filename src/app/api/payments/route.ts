@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllPayments, addPayment, deletePayment, PaymentRow } from '@/lib/sheets';
+import { getAllPayments, addPayment, addPaymentsBulk, deletePayment, PaymentRow } from '@/lib/sheets';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,11 +17,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Support bulk payments
     if (Array.isArray(body)) {
-      for (const payment of body as PaymentRow[]) {
-        await addPayment(payment);
-      }
+      await addPaymentsBulk(body as PaymentRow[]);
       return NextResponse.json({ success: true, count: body.length });
     }
 
